@@ -5,6 +5,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
     return {
+      base: './', // 关键配置：设置基础路径为相对路径
       server: {
         port: 3000,
         host: '0.0.0.0',
