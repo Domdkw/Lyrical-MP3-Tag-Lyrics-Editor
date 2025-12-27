@@ -1,0 +1,173 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>深度解析 - Lyrical Studio 工作原理</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: #05070a;
+            color: #e2e8f0;
+            line-height: 1.8;
+        }
+        .glass-card {
+            background: rgba(15, 23, 42, 0.4);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 2rem;
+            padding: 2.5rem;
+        }
+        .code-block {
+            background: #0d1117;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.9rem;
+            color: #7dd3fc;
+            border: 1px solid rgba(125, 211, 252, 0.1);
+            margin: 1.5rem 0;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);
+        }
+        .step-number {
+            background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 900;
+        }
+        .highlight-box {
+            border-left: 4px solid #6366f1;
+            background: rgba(99, 102, 241, 0.05);
+            padding: 1rem 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0 1rem 1rem 0;
+        }
+    </style>
+</head>
+<body class="selection:bg-indigo-500/30">
+    <div class="max-w-4xl mx-auto px-6 py-24">
+        <header class="mb-20">
+            <a href="/" class="text-indigo-400 font-bold text-sm uppercase tracking-widest mb-8 inline-block hover:text-indigo-300 transition-colors">← 返回编辑器</a>
+            <h1 class="text-6xl font-black mb-6 tracking-tighter leading-tight bg-gradient-to-r from-white via-white to-slate-500 bg-clip-text text-transparent">
+                从代码到节奏：<br/>同步工具的设计艺术
+            </h1>
+            <p class="text-slate-400 text-lg max-w-2xl">
+                本文档面向初学者，深入浅出地解释 Lyrical Studio 是如何处理复杂的二进制音频文件并实现毫米级歌词对齐的。
+            </p>
+        </header>
+
+        <main class="space-y-24">
+            <!-- Section 1 -->
+            <section class="glass-card">
+                <div class="flex items-center gap-4 mb-8">
+                    <span class="step-number text-4xl">01</span>
+                    <h2 class="text-3xl font-extrabold text-white">二进制文件的“开箱即读”</h2>
+                </div>
+                <p class="text-slate-300 mb-6">
+                    MP3 文件不仅仅是音频。它的头部或尾部包含了一个名为 <span class="text-white font-bold">ID3</span> 的元数据结构。就像一本书的封面和目录。
+                </p>
+                <div class="highlight-box">
+                    <p class="text-sm font-medium">为什么我们需要 ArrayBuffer？</p>
+                    <p class="text-xs text-slate-400 mt-2">普通的文本读取器会破坏音频的二进制数据。我们使用 HTML5 的 <code>File.arrayBuffer()</code> 将文件读取为原始字节流，这就像是在不解压的情况下观察一个压缩包。</p>
+                </div>
+                <div class="code-block">
+// 使用 jsmediatags 提取封面
+jsmediatags.read(file, {
+  onSuccess: (tag) => {
+    const { data, format } = tag.tags.picture;
+    // data 是一个字节数组 [255, 216, 255, ...]
+    // 我们需要将它转换成浏览器能理解的图像 URL
+  }
+});
+                </div>
+            </section>
+
+            <!-- Section 2 -->
+            <section class="glass-card relative overflow-hidden">
+                <div class="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
+                    <svg width="200" height="200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <div class="flex items-center gap-4 mb-8">
+                    <span class="step-number text-4xl">02</span>
+                    <h2 class="text-3xl font-extrabold text-white">实时同步：时间的捕捉者</h2>
+                </div>
+                <p class="text-slate-300 mb-6">
+                    最让初学者困惑的是：“当我按下回车时，程序怎么知道是哪一秒？”
+                </p>
+                <div class="space-y-4">
+                    <p class="text-slate-400">
+                        1. <span class="text-white font-bold">监听器</span>：我们创建了一个全局键盘监听器，专门寻找 <code>Enter</code> 键。
+                    </p>
+                    <p class="text-slate-400">
+                        2. <span class="text-white font-bold">状态指针</span>：<code>syncIndex</code> 决定了当前哪一行正在“等待时间”。
+                    </p>
+                    <p class="text-slate-400">
+                        3. <span class="text-white font-bold">捕捉</span>：按下瞬间，读取 <code>audio.currentTime</code>。这是一个带小数的秒数（如 12.3456）。
+                    </p>
+                </div>
+                <div class="code-block">
+// 核心同步逻辑
+const handleBeatMark = () => {
+  const currentTime = audioRef.current.currentTime;
+  updateLyricTime(syncIndex, currentTime); // 记录时间
+  setSyncIndex(syncIndex + 1); // 指向下一行
+};
+                </div>
+            </section>
+
+            <!-- Section 3 -->
+            <section class="glass-card">
+                <div class="flex items-center gap-4 mb-8">
+                    <span class="step-number text-4xl">03</span>
+                    <h2 class="text-3xl font-extrabold text-white">断点重录的逻辑设计</h2>
+                </div>
+                <p class="text-slate-300 mb-6">
+                    如果你在第 50 句歌词时打错了，不需要重头再来。
+                </p>
+                <div class="bg-indigo-500/10 border border-indigo-500/20 p-6 rounded-2xl mb-6">
+                    <p class="text-sm text-indigo-300 font-bold mb-2">实现步骤：</p>
+                    <ul class="list-decimal list-inside text-xs text-slate-400 space-y-2">
+                        <li>定位：用户点击第 N 行的“同步”图标。</li>
+                        <li>回溯：播放器自动跳转到第 N 行的时间点（如果已存在）。</li>
+                        <li>重置：清空从第 N+1 行开始的所有旧时间戳。</li>
+                        <li>接管：将 <code>syncIndex</code> 设为 N+1，进入打点模式。</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Section 4 -->
+            <section class="glass-card bg-indigo-600/5 border-indigo-500/20">
+                <div class="flex items-center gap-4 mb-8">
+                    <span class="step-number text-4xl">04</span>
+                    <h2 class="text-3xl font-extrabold text-white">封装与导出：重新拼装二进制</h2>
+                </div>
+                <p class="text-slate-300 mb-6">
+                    最后一步是将歌词“永久缝合”进音乐。
+                </p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                    <div class="p-6 bg-black/40 rounded-2xl border border-white/5">
+                        <h4 class="font-bold text-white mb-2 italic">USLT 帧</h4>
+                        <p class="text-slate-500">存储歌词的 ID3 标准容器。它是“非同步歌词”，但支持通过带有 [mm:ss.ms] 前缀的 LRC 格式来实现同步显示。</p>
+                    </div>
+                    <div class="p-6 bg-black/40 rounded-2xl border border-white/5">
+                        <h4 class="font-bold text-white mb-2 italic">APIC 帧</h4>
+                        <p class="text-slate-500">存储封面图。我们通过保存原始的 rawPicture 字节，确保了用户下载后的文件封面依然清晰，不会被二次压缩。</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="mt-32 pt-12 border-t border-white/5 text-center">
+            <p class="text-slate-600 text-sm font-medium">Lyrical Studio - 赋能每一位节奏掌控者</p>
+            <div class="flex justify-center gap-6 mt-6">
+                <div class="w-2 h-2 rounded-full bg-indigo-500"></div>
+                <div class="w-2 h-2 rounded-full bg-purple-500"></div>
+                <div class="w-2 h-2 rounded-full bg-blue-500"></div>
+            </div>
+        </footer>
+    </div>
+</body>
+</html>

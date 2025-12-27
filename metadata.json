@@ -1,0 +1,6 @@
+
+{
+  "name": "Lyrical - MP3 Tag & Lyrics Editor",
+  "description": "A sophisticated tool to view and edit MP3 metadata, extract album art, and synchronize lyrics in real-time by tapping to the beat.",
+  "requestFramePermissions": []
+}
