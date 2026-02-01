@@ -132,6 +132,16 @@ const App: React.FC = () => {
     } catch (e) { alert("导出失败"); }
   };
 
+  const downloadLRC = () => {
+    if (lyrics.length === 0) return;
+    const lrcContent = serializeLrc(lyrics);
+    const blob = new Blob([lrcContent], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${metadata?.title || 'lyrics'}.lrc`;
+    a.click();
+  };
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (status === 'syncing' && e.key === 'Enter') {
@@ -249,6 +259,7 @@ const App: React.FC = () => {
                       <p className="text-emerald-400 font-bold text-xs uppercase tracking-widest">✓ Sync Complete</p>
                     </div>
                     <button onClick={saveMP3} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 rounded-2xl text-[11px] font-bold uppercase tracking-widest shadow-xl shadow-emerald-500/30 transition-all">导出同步文件</button>
+                    <button onClick={downloadLRC} className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 rounded-2xl text-[11px] font-bold uppercase tracking-widest shadow-xl shadow-indigo-600/20 transition-all">下载 LRC 文件</button>
                     <button onClick={() => setStatus('idle')} className="w-full py-4 bg-white/5 hover:bg-white/10 rounded-2xl text-[11px] font-bold border border-white/5 transition-all uppercase tracking-widest">返回编辑器</button>
                   </div>
                 )}
